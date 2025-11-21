@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Ticket Triage Agent Demo</title>
+    <!-- Load Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Styling for the step-by-step log */
+        #progress-steps p {
+            padding: 4px 0;
+            opacity: 0.8;
+            transition: opacity 0.5s;
+        }
+        #progress-steps .current {
+            opacity: 1;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+
+    <div class="w-full max-w-2xl bg-white p-8 shadow-2xl rounded-xl border border-gray-100">
+        <h1 class="text-3xl font-bold mb-6 text-gray-800 border-b pb-3 flex items-center">
+            <svg class="w-7 h-7 mr-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c1.657 0 3 .895 3 2s-1.343 2-3 2-3-.895-3-2 1.343-2 3-2zM9 14h6M4 21h16a2 2 0 002-2V5a2 2 0 00-2-2H4a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+            Smart Ticket Triage Agent Demo
+        </h1>
+        <p class="text-sm text-gray-600 mb-6">Type in a customer support request (e.g., "My API key is broken and my whole production system is down.") to test the agent's autonomous routing logic.</p>
+
+        <div class="space-y-4">
+            <!-- Input Area -->
+            <input
+                id="query"
+                type="text"
+                placeholder="Enter customer support ticket content here..."
+                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150"
+                onkeypress="if(event.key === 'Enter') sendQuery()"
+            >
+            <button
+                onclick="sendQuery()"
+                id="invoke-button"
+                class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-200 shadow-md disabled:bg-gray-400"
+            >
+                Start Triage Agent
+            </button>
+        </div>
+
+        <!-- Agent Progress & Response Area -->
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold mb-3 text-gray-700">Agent Triage Status</h2>
+            
+            <!-- Progress Steps Area -->
+            <div id="progress-steps" class="space-y-2 mb-6 p-4 bg-gray-100 rounded-lg text-sm font-mono border border-gray-200 min-h-[100px]">
+                <p class="text-gray-500">Awaiting input...</p>
+            </div>
+
+            <!-- Final Response Alert -->
+            <div id="final-alert" class="p-4 rounded-lg shadow-lg hidden mt-4">
+                <p id="final-message" class="font-bold text-lg"></p>
+                <div id="classification-details" class="text-sm mt-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function sendQuery() {
+            const queryInput = document.getElementById('query');
+            const invokeButton = document.getElementById('invoke-button');
+            const progressSteps = document.getElementById('progress-steps');
+            const finalAlert = document.getElementById('final-alert');
+            const finalMessage = document.getElementById('final-message');
+            const classificationDetailsDiv = document.getElementById('classification-details');
+            const query = queryInput.value.trim();
+
+            if (!query) return;
+            
+            // Disable button and clear previous results
+            invokeButton.disabled = true;
+            invokeButton.textContent = "Agent Working...";
+            finalAlert.classList.add('hidden');
+            progressSteps.innerHTML = '';
+            
+            // --- 1. Simulated Steps for UX (2-3 steps as requested) ---
+            const stepMessages = [
+                "1. Agent Initialized: Receiving and parsing ticket input.",
+                "2. Classification (Gemini Call): Analyzing content to determine Severity, Department, and Action.",
+                "3. Routing (LangGraph Decision): Evaluating policy for escalation vs. standard logging."
+            ];
+
+            // Function to run simulated steps
+            async function runSimulatedSteps() {
+                for (let i = 0; i < stepMessages.length; i++) {
+                    const p = document.createElement('p');
+                    p.textContent = stepMessages[i];
+                    p.className = 'text-blue-500 animate-pulse current';
+                    progressSteps.appendChild(p);
+                    progressSteps.scrollTop = progressSteps.scrollHeight;
+                    
+                    // Delay for better visualization
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    p.classList.remove('animate-pulse', 'current');
+                    p.classList.add('text-green-600');
+                }
+            }
+            
+            await runSimulatedSteps();
+            
+            // --- 2. API Call to Flask Backend ---
+            let data = null;
+            let response = null;
+
+            try {
+                // Add final step message before calling API
+                const finalStep = document.createElement('p');
+                finalStep.textContent = "4. Executing Final Action...";
+                finalStep.className = 'text-orange-500 animate-pulse current';
+                progressSteps.appendChild(finalStep);
+                
+                response = await fetch('/invoke', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+
+                data = await response.json();
+                
+                finalStep.classList.remove('animate-pulse', 'current', 'text-orange-500');
+                finalStep.classList.add('text-green-600');
+
+                // --- 3. Process and Display Final Result ---
+                finalAlert.classList.remove('hidden');
+
+                if (response.ok) {
+                    const severity = data.severity.toUpperCase();
+                    
+                    finalMessage.textContent = data.final_result;
+                    
+                    // Style alert based on Severity/Error
+                    if (severity === 'HIGH') {
+                        finalAlert.className = 'p-4 rounded-lg shadow-2xl mt-4 bg-red-100 text-red-800 border-red-400 border animate-none';
+                        progressSteps.innerHTML += `<p class="text-red-600 font-bold mt-2">5. Action Complete: HIGH PRIORITY ESCALATION!</p>`;
+                    } else { // MEDIUM, LOW, or UNKNOWN (handled as standard logging)
+                        finalAlert.className = 'p-4 rounded-lg shadow-md mt-4 bg-green-100 text-green-800 border-green-400 border';
+                        progressSteps.innerHTML += `<p class="text-green-600 font-bold mt-2">5. Action Complete: Standard logging performed.</p>`;
+                    }
+
+                    // Display classification details
+                    const details = data.classification_details;
+                    classificationDetailsDiv.innerHTML = `
+                        <p>Department: <strong>${details.Department || 'N/A'}</strong></p>
+                        <p>Action Required: <strong>${details.Action_Required || 'N/A'}</strong></p>
+                    `;
+
+                } else {
+                    // Handle non-200 responses (e.g., API Key Error)
+                    finalMessage.textContent = data.final_result || 'An unknown error occurred.';
+                    finalAlert.className = 'p-4 rounded-lg shadow-lg mt-4 bg-yellow-100 text-yellow-800 border-yellow-400 border';
+                    progressSteps.innerHTML += `<p class="text-yellow-600 font-bold mt-2">5. Action Failed: Check API Key / Server Logs.</p>`;
+                    classificationDetailsDiv.innerHTML = `<p>Error Details: ${data.message || ''}</p>`;
+                }
+
+            } catch (error) {
+                console.error("Fetch error:", error);
+                finalMessage.textContent = "Network Error: Could not reach the Flask server. Please ensure 'app.py' is running.";
+                finalAlert.className = 'p-4 rounded-lg shadow-lg mt-4 bg-gray-700 text-white border-gray-900 border';
+                progressSteps.innerHTML += `<p class="text-gray-500 font-bold mt-2">5. Network connection failed.</p>`;
+                classificationDetailsDiv.innerHTML = '';
+            } finally {
+                // Re-enable button
+                invokeButton.disabled = false;
+                invokeButton.textContent = "Start Triage Agent";
+                queryInput.value = '';
+            }
+        }
+    </script>
+</body>
+</html>
